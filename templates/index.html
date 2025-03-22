@@ -116,6 +116,9 @@
             display: none;
             margin-top: 10px;
         }
+        #resume-upload-section {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -123,10 +126,12 @@
         <h1>HR Interviewer</h1>
 
         <div id="start-section" class="form-section">
-            <p>Upload your resume (PDF or DOCX):</p>
-            <input type="file" id="resume-file" accept=".pdf,.docx" required>
+            <div id="resume-upload-section">
+                <p>Upload your resume (PDF or DOCX):</p>
+                <input type="file" id="resume-file" accept=".pdf,.docx">
+            </div>
             <p>Select interview track:</p>
-            <select id="interview-track" onchange="toggleSubTrack()">
+            <select id="interview-track" onchange="toggleSubTrack(); toggleResumeUpload();">
                 <option value="resume">Resume-based</option>
                 <option value="school_based">School Based</option>
                 <option value="interest_areas">Interest Areas</option>
@@ -286,6 +291,20 @@
             }
         }
 
+        function toggleResumeUpload() {
+            const track = document.getElementById('interview-track').value;
+            const resumeSection = document.getElementById('resume-upload-section');
+            const resumeInput = document.getElementById('resume-file');
+            
+            if (track === 'resume') {
+                resumeSection.style.display = 'block';
+                resumeInput.required = true;
+            } else {
+                resumeSection.style.display = 'none';
+                resumeInput.required = false;
+            }
+        }
+
         async function startInterview() {
             const interviewTrack = document.getElementById('interview-track').value;
             const subTrack = document.getElementById('sub-track').value;
@@ -293,8 +312,8 @@
             const mode = document.querySelector('input[name="mode"]:checked').value;
             const resumeFile = document.getElementById('resume-file').files[0];
 
-            if (!resumeFile) {
-                alert('Please upload your resume.');
+            if (interviewTrack === 'resume' && !resumeFile) {
+                alert('Please upload your resume for resume-based interview.');
                 return;
             }
 
@@ -305,7 +324,9 @@
             }
             formData.append('language', language);
             formData.append('mode', mode);
-            formData.append('resume', resumeFile);
+            if (interviewTrack === 'resume' && resumeFile) {
+                formData.append('resume', resumeFile);
+            }
 
             const response = await fetch('/start_interview', {
                 method: 'POST',
@@ -338,7 +359,7 @@
                     setTimeout(() => {
                         document.getElementById('status-text').textContent = 'Listening...';
                         recognition.start();
-                    }, 2000);  // 2-second delay before listening
+                    }, 2000);
                 });
             }
         }
@@ -391,11 +412,15 @@
                         setTimeout(() => {
                             document.getElementById('status-text').textContent = 'Listening...';
                             recognition.start();
-                        }, 2000);  // 2-second delay before listening
+                        }, 2000);
                     });
                 }
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleResumeUpload();
+        });
     </script>
 </body>
 </html>
