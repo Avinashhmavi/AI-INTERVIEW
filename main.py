@@ -21,7 +21,7 @@ app = Flask(__name__, template_folder='.', static_folder='.')
 os.makedirs('uploads', exist_ok=True)
 
 # Initialize Groq client
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+client = Groq(api_key=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)
 
 # Global state management
 questions = []
