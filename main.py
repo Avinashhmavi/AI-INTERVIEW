@@ -8,6 +8,7 @@ import docx2txt
 from dotenv import load_dotenv
 from collections import defaultdict
 import logging
+import re
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -20,7 +21,7 @@ app = Flask(__name__, template_folder='.', static_folder='.')
 os.makedirs('uploads', exist_ok=True)
 
 # Initialize Groq client
-client = Groq(api_key="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")
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 # Global state management
 questions = []
@@ -64,6 +65,10 @@ INTERPERSONAL_KEYWORDS = ["team", "collaboration", "communication", "leadership"
 
 def normalize_text(text):
     return " ".join(text.strip().split()).lower()
+
+def strip_numbering(text):
+    # Remove numbering like "1.", "2.", etc., from the beginning of the text
+    return re.sub(r'^\d+\.\s*', '', text).strip()
 
 def load_questions_into_memory():
     if not os.path.exists(pdf_path):
@@ -131,7 +136,7 @@ def load_questions_into_memory():
                     continue
             
             if line and line[0].isdigit() and '.' in line.split()[0]:
-                question = line.split('.', 1)[1].strip()
+                question = strip_numbering(line)
                 if current_section == 'resume_flow':
                     structure['resume_flow'].append(question)
                     logging.debug(f"Added to resume_flow: {question}")
@@ -154,7 +159,10 @@ if not load_questions_into_memory():
     logging.error("Failed to load questions at startup. Using fallback questions.")
     structure['school_based']['IIM'] = [
         "Why do you want to pursue an MBA from IIM specifically?",
-        "What are your short-term and long-term career goals post-MBA?"
+        "What are your short-term and long-term career goals post-MBA?",
+        "How does IIM’s curriculum align with your career aspirations?",
+        "How do you plan to contribute to the peer-learning culture at IIM?",
+        "Which specialization are you interested in, and why?"
     ]
 
 def generate_resume_questions(resume_text):
@@ -162,7 +170,7 @@ def generate_resume_questions(resume_text):
         logging.warning("Empty resume text provided.")
         return ["Tell me about yourself."]
     
-    prompt = f"Based on the following resume, generate 10 unique and relevant interview questions tailored to the candidate's experience and background:\n\n{resume_text}"
+    prompt = f"Based on the following resume, generate 10 unique and relevant interview questions tailored to the candidate's experience and background (do not include numbers in questions):\n\n{resume_text}"
     try:
         response = client.chat.completions.create(
             model="mixtral-8x7b-32768",
@@ -171,30 +179,30 @@ def generate_resume_questions(resume_text):
             max_tokens=500,
         )
         questions_text = response.choices[0].message.content
-        questions = [q.strip() for q in questions_text.split('\n') if q.strip() and q not in asked_questions]
+        questions = [strip_numbering(q.strip()) for q in questions_text.split('\n') if q.strip() and q not in asked_questions]
         logging.debug(f"Generated resume questions: {questions}")
         if not questions or len(questions) < 5:
             logging.warning("Insufficient or no valid questions generated from resume.")
             questions = [
-                "Tell me about your most significant achievement in your career so far.",
-                "What skills from your experience do you bring to an MBA program?",
-                "Can you describe a challenge you faced in your last role?",
-                "Why did you choose your current career path?",
-                "How has your experience prepared you for an MBA?"
+                "Tell me about your most significant achievement in your career so far",
+                "What skills from your experience do you bring to an MBA program",
+                "Can you describe a challenge you faced in your last role",
+                "Why did you choose your current career path",
+                "How has your experience prepared you for an MBA"
             ]
         return questions[:10]
     except Exception as e:
         logging.error(f"Error generating resume questions: {e}")
         return [
-            "What motivated you to apply for this MBA?",
-            "Can you walk me through your career journey?",
-            "What’s one key lesson from your professional experience?"
+            "What motivated you to apply for this MBA",
+            "Can you walk me through your career journey",
+            "What’s one key lesson from your professional experience"
         ]
 
 def generate_follow_up_question(question, answer, attempt=1):
     if attempt > 3:
         return None
-    prompt = f"Based on the following question and answer, generate a unique follow-up question if appropriate, or say 'No follow-up needed.'\n\nQuestion: {question}\nAnswer: {answer}"
+    prompt = f"Based on the following question and answer, generate a unique follow-up question if appropriate (do not include numbers), or say 'No follow-up needed.'\n\nQuestion: {question}\nAnswer: {answer}"
     try:
         response = client.chat.completions.create(
             model="mixtral-8x7b-32768",
@@ -205,6 +213,7 @@ def generate_follow_up_question(question, answer, attempt=1):
         follow_up = response.choices[0].message.content.strip()
         if "no follow-up needed" in follow_up.lower() or follow_up in asked_questions:
             return generate_follow_up_question(question, answer, attempt + 1)
+        follow_up = strip_numbering(follow_up)
         logging.debug(f"Generated follow-up: {follow_up}")
         return follow_up
     except Exception as e:
@@ -218,10 +227,9 @@ def generate_conversational_reply(answer):
             model="mixtral-8x7b-32768",
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": answer}],
             temperature=0.8,
-            max_tokens=50,  # Increased to ensure complete sentences
+            max_tokens=50,
         )
         reply = response.choices[0].message.content.strip()
-        # Ensure the reply ends with proper punctuation if truncated
         if not reply.endswith(('.', '!', '?')):
             reply += '.'
         return reply
@@ -229,20 +237,43 @@ def generate_conversational_reply(answer):
         return "That’s a great response, thanks for sharing!"
 
 def evaluate_response(question, answer, job_description):
-    evaluation_prompt = f"Evaluate this for a {job_description} role: Q: {question} A: {answer}. Brief feedback, score out of 10 (e.g., 'Score: 8/10')."
+    evaluation_prompt = f"""Evaluate this response for a {job_description} role:
+    Question: {question}
+    Answer: {answer}
+    
+    Provide brief feedback and a score out of 10 based on these criteria:
+    - If the answer is gibberish, irrelevant (e.g., 'xyzzz', 'abcd'), or completely off-topic: Score 0/10
+    - If the answer is somewhat relevant but lacks depth or detail: Score 3-5/10
+    - If the answer is relevant and shows good understanding: Score 6-8/10
+    - If the answer is highly relevant, detailed, and insightful: Score 9-10/10
+    Format: '[Feedback] Score: X/10'
+    """
     try:
+        # Check for irrelevant answers first
+        irrelevant_keywords = ['xyzzz', 'abcd', 'lorem ipsum', 'vhxs', 'xncsdc', 'sxbdbc', 'xsfwdx', 'sdsdx', 'zsx', 'sxsx']
+        answer_lower = answer.lower().strip()
+        if not answer_lower or any(keyword in answer_lower for keyword in irrelevant_keywords) or len(answer_lower) < 10:
+            return "[Answer is too short or irrelevant] Score: 0/10", 0
+
         response = client.chat.completions.create(
             model="mixtral-8x7b-32768",
             messages=[{"role": "user", "content": evaluation_prompt}],
             temperature=0.5,
-            max_tokens=50,
+            max_tokens=100,
         )
-        evaluation_text = response.choices[0].message.content
+        evaluation_text = response.choices[0].message.content.strip()
+        
         score_line = [line for line in evaluation_text.split('\n') if "Score:" in line]
-        score = int(score_line[0].split("Score: ")[1].split("/")[0]) if score_line else 5
+        if score_line:
+            score_str = score_line[0].split("Score: ")[1].split("/")[0]
+            score = int(score_str) if score_str.isdigit() else 0
+        else:
+            score = 0
+        
         return evaluation_text, score
-    except Exception:
-        return "Good effort! Score: 5/10", 5
+    except Exception as e:
+        logging.error(f"Error in evaluation: {e}")
+        return "[Answer is too short or irrelevant] Score: 0/10", 0
 
 def is_interpersonal_question(question):
     return any(keyword in question.lower() for keyword in INTERPERSONAL_KEYWORDS)
@@ -294,53 +325,53 @@ def start_interview():
     interview_track = request.form['interview_track']
     sub_track = request.form.get('sub_track', '')
     use_voice = mode == 'voice'
-    resume_file = request.files.get('resume')
+    resume_file = request.files.get('resume') if interview_track == 'resume' else None
 
-    if not resume_file:
-        return jsonify({"error": "Resume file is required"}), 400
-
-    resume_path = os.path.join('uploads', resume_file.filename)
-    resume_file.save(resume_path)
-    if resume_path.lower().endswith('.pdf'):
-        with pdfplumber.open(resume_path) as pdf:
-            resume_text = ''.join(page.extract_text() or '' for page in pdf.pages)
-    elif resume_path.lower().endswith('.docx'):
-        resume_text = docx2txt.process(resume_path)
-    else:
+    resume_text = ""
+    if interview_track == 'resume':
+        if not resume_file:
+            return jsonify({"error": "Resume file is required for resume-based track"}), 400
+        
+        resume_path = os.path.join('uploads', resume_file.filename)
+        resume_file.save(resume_path)
+        if resume_path.lower().endswith('.pdf'):
+            with pdfplumber.open(resume_path) as pdf:
+                resume_text = ''.join(page.extract_text() or '' for page in pdf.pages)
+        elif resume_path.lower().endswith('.docx'):
+            resume_text = docx2txt.process(resume_path)
+        else:
+            os.remove(resume_path)
+            return jsonify({"error": "Unsupported file format"}), 400
         os.remove(resume_path)
-        return jsonify({"error": "Unsupported file format"}), 400
-    os.remove(resume_path)
-    logging.debug(f"Resume text extracted: {resume_text[:100]}...")
+        logging.debug(f"Resume text extracted: {resume_text[:100]}...")
 
     questions = []
     current_question = 0
     evaluations = []
     asked_questions = set()
-    resume_questions = generate_resume_questions(resume_text)
-    logging.debug(f"Resume questions generated: {resume_questions}")
-    asked_questions.update(resume_questions)
-
+    
     if interview_track == "resume":
+        resume_questions = generate_resume_questions(resume_text)
         predefined_questions = structure['resume_flow'][:3]
         questions = resume_questions + [q for q in predefined_questions if q not in resume_questions]
+        asked_questions.update(resume_questions)
         logging.debug(f"Resume track questions: resume={resume_questions}, predefined={predefined_questions}, total={questions}")
     elif interview_track == "school_based":
         if sub_track in structure['school_based'] and structure['school_based'][sub_track]:
             questions = structure['school_based'][sub_track].copy()
-            logging.debug(f"Selected school_based[{sub_track}]: {questions}")
         else:
             questions = [q for sublist in structure['school_based'].values() for q in sublist]
-            logging.debug(f"Fallback to all school_based questions: {questions}")
+        logging.debug(f"School-based questions: {questions}")
     elif interview_track == "interest_areas":
         if sub_track in structure['interest_areas'] and structure['interest_areas'][sub_track]:
             questions = structure['interest_areas'][sub_track].copy()
-            logging.debug(f"Selected interest_areas[{sub_track}]: {questions}")
         else:
             questions = [q for sublist in structure['interest_areas'].values() for q in sublist]
-            logging.debug(f"Fallback to all interest_areas questions: {questions}")
+        logging.debug(f"Interest areas questions: {questions}")
 
-    questions = [q for q in questions if q not in asked_questions]
-    logging.debug(f"Questions after filtering: {questions}")
+    # Ensure all questions are stripped of numbering one last time
+    questions = [strip_numbering(q) for q in questions if q not in asked_questions]
+    logging.debug(f"Questions after filtering and stripping: {questions}")
     asked_questions.update(questions)
 
     if not questions:
