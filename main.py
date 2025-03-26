@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from collections import defaultdict
 import logging
 import re
+import threading
+import queue
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -36,6 +38,7 @@ job_description = "MBA Candidate"
 use_voice = False
 asked_questions = set()
 resume_questions = []
+voice_answer_queue = queue.Queue()
 
 # Interview context
 interview_context = {
@@ -44,7 +47,7 @@ interview_context = {
     'previous_answers': [],
     'scores': [],
     'follow_up_depth': 0,
-    'max_follow_ups': 2,
+    'max_follow_ups': 2,  # Still allows up to 2 follow-ups, but 1 is compulsory
     'interview_track': None,
     'sub_track': None,
     'asked_questions': set()
@@ -185,7 +188,7 @@ def generate_resume_questions(resume_text):
         questions_text = response_json['choices'][0]['message']['content']
         questions = [strip_numbering(q.strip()) for q in questions_text.split('\n') if q.strip() and q not in asked_questions]
         logging.debug(f"Generated resume questions: {questions}")
-        if not questions or len(questions) < 5:
+        if not questions or len(questions) < 7:
             logging.warning("Insufficient or no valid questions generated from resume.")
             questions = [
                 "Tell me about your most significant achievement in your career so far",
@@ -205,7 +208,6 @@ def generate_resume_questions(resume_text):
 
 def evaluate_response(question, answer, job_description):
     """Evaluate the candidate's answer using the LlamaAPI model with a fallback."""
-    # Fallback evaluation if LlamaAPI fails
     def fallback_evaluation(question, answer):
         answer = answer.lower().strip()
         if len(answer) < 5 or not any(c.isalpha() for c in answer):
@@ -218,7 +220,7 @@ def evaluate_response(question, answer, job_description):
         if not common_keywords:
             return "[Answer is irrelevant to the question] Score: 0/10", 0
         
-        score = min(10, max(3, len(answer.split()) // 5))  # Scale score based on length, min 3 for relevance
+        score = min(10, max(3, len(answer.split()) // 5))
         feedback = "[Answer is relevant but could use more detail]" if score < 7 else "[Answer is relevant and detailed]"
         return f"{feedback} Score: {score}/10", score
 
@@ -249,7 +251,7 @@ Ensure the score reflects the answer's quality relative to the question. Format:
             logging.debug(f"Evaluation text: {evaluation_text}")
             
             score_match = re.search(r'Score:\s*(\d+)/10', evaluation_text)
-            score = int(score_match.group(1)) if score_match else 5  # Default to 5 if parsing fails
+            score = int(score_match.group(1)) if score_match else 5
             return evaluation_text, score
         except Exception as e:
             logging.error(f"Error in LlamaAPI evaluation: {e}")
@@ -258,23 +260,31 @@ Ensure the score reflects the answer's quality relative to the question. Format:
         logging.warning("LlamaAPI client not initialized. Using fallback evaluation.")
         return fallback_evaluation(question, answer)
 
-def generate_follow_up_question(question, answer, score, attempt=1):
-    """Generate a follow-up question based on the answer and its score, ensuring at least one follow-up."""
-    if attempt > 2:  # Limit to 2 attempts max
+def generate_follow_up_question(question, answer, score, interview_track, attempt=1):
+    """Generate a compulsory follow-up question based on the interview type."""
+    if attempt > 2:
         return None
     
-    # Force a follow-up on the first attempt, regardless of score
-    if attempt == 2:
-        prompt = f"""Given the question and answer below for an MBA candidate interview, with a score of {score}/10, generate a relevant follow-up question to probe further or encourage elaboration. Even if the answer is poor or irrelevant, craft a question that steers the candidate back to the interview context (e.g., MBA goals, experience, or skills).
+    if interview_track == "resume":
+        prompt = f"""Given the question and answer below for a resume-based MBA candidate interview (score: {score}/10), generate a follow-up question focusing on the candidate's experience, skills, or career goals.
+
+Question: {question}
+Answer: {answer}
+Score: {score}/10"""
+    elif interview_track == "school_based":
+        prompt = f"""Given the question and answer below for a school-based MBA candidate interview (score: {score}/10), generate a follow-up question focusing on the candidate's academic motivations, school fit, or contributions.
+
+Question: {question}
+Answer: {answer}
+Score: {score}/10"""
+    elif interview_track == "interest_areas":
+        prompt = f"""Given the question and answer below for an interest-area-based MBA candidate interview (score: {score}/10), generate a follow-up question focusing on the candidate's passion, knowledge, or application in that area.
 
 Question: {question}
 Answer: {answer}
 Score: {score}/10"""
     else:
-        # For subsequent attempts, only generate if score < 7
-        if score >= 7:
-            return None
-        prompt = f"""Given the question and answer below for an MBA candidate interview, with a score of {score}/10, generate a follow-up question to encourage elaboration or clarification if the answer is relevant but lacks detail or depth.
+        prompt = f"""Given the question and answer below for an MBA candidate interview (score: {score}/10), generate a relevant follow-up question.
 
 Question: {question}
 Answer: {answer}
@@ -290,23 +300,34 @@ Score: {score}/10"""
         }
         response = client.run(api_request_json)
         follow_up = response.json()['choices'][0]['message']['content'].strip()
-        if "no follow-up needed" in follow_up.lower() or follow_up in asked_questions:
-            # Fallback for first attempt if LLM fails to generate a valid question
-            if attempt == 1:
-                return "Can you tell me more about how this relates to your MBA goals?"
-            return None
         follow_up = strip_numbering(follow_up)
+        if follow_up in asked_questions or not follow_up:
+            if attempt == 1:
+                if interview_track == "resume":
+                    return "How did that experience shape your career goals?"
+                elif interview_track == "school_based":
+                    return "How does this align with your choice of school?"
+                elif interview_track == "interest_areas":
+                    return "Why is this area important to you?"
+                return "Can you elaborate further?"
+            return None
         logging.debug(f"Generated follow-up: {follow_up}")
         return follow_up
     except Exception as e:
         logging.error(f"Error generating follow-up question: {e}")
-        # Fallback for first attempt if API fails
         if attempt == 1:
-            return "Can you explain how this connects to your career aspirations?"
+            if interview_track == "resume":
+                return "What skills did you gain from that?"
+            elif interview_track == "school_based":
+                return "How will this help you at the school?"
+            elif interview_track == "interest_areas":
+                return "How do you plan to pursue this interest?"
+            return "Can you provide more details?"
         return None
+
 def generate_conversational_reply(answer):
     """Generate a friendly, human-like reply to the candidate's answer."""
-    system_prompt = "As a friendly HR interviewer, generate a short, complete sentence as a reply to the candidate’s answer. Keep it engaging and human-like,and ensure it's a full thought."
+    system_prompt = "As a friendly HR interviewer, generate a short, complete sentence as a reply to the candidate’s answer. Keep it engaging and human-like, and ensure it's a full thought."
     try:
         api_request_json = {
             "model": "deepseek-r1",
@@ -327,13 +348,37 @@ def generate_conversational_reply(answer):
         logging.error(f"Error generating reply: {e}")
         return "Thanks for your response."
 
+def wait_for_silence():
+    """Simulate waiting for 6 seconds of silence in voice mode."""
+    silence_start = None
+    while True:
+        try:
+            # Check if there's an answer in the queue (simulating audio input)
+            answer = voice_answer_queue.get_nowait()
+            silence_start = None  # Reset silence timer if there's input
+            return answer
+        except queue.Empty:
+            if silence_start is None:
+                silence_start = time.time()
+            elif time.time() - silence_start >= 6:
+                return None  # 6 seconds of silence detected
+            time.sleep(0.1)  # Small sleep to avoid busy-waiting
+
 @app.route('/submit_answer', methods=['POST'])
 def submit_answer():
     """Handle submission of an answer and proceed with the interview."""
     global current_question, evaluations, questions, asked_questions, interview_context
     
-    answer = request.json.get('answer', "No response provided")
+    if use_voice:
+        # In voice mode, wait for the candidate to finish (simulated via queue)
+        answer = wait_for_silence()
+        if answer is None:
+            answer = "No response provided after 6 seconds of silence."
+    else:
+        answer = request.json.get('answer', "No response provided")
+    
     main_question = questions[current_question]
+    interview_track = interview_context["interview_track"]
     
     if main_question in resume_questions:
         category = "resume"
@@ -356,17 +401,17 @@ def submit_answer():
     interview_context["scores"].append(score)
     interview_context["current_question_idx"] = current_question
 
-    # Follow-up logic: ask follow-ups for relevant answers (score > 1) up to max_follow_ups
-    if score > 1 and interview_context["follow_up_depth"] < interview_context["max_follow_ups"]:
-        follow_up = generate_follow_up_question(main_question, answer, score)
-        if not follow_up and score < 7:  # Fallback for relevant but low-scoring answers
-            follow_up = "Can you provide more details on that?"
+    # Compulsory follow-up question for every answer
+    if interview_context["follow_up_depth"] < interview_context["max_follow_ups"]:
+        follow_up = generate_follow_up_question(main_question, answer, score, interview_track)
+        if not follow_up and interview_context["follow_up_depth"] == 0:  # Ensure at least one follow-up
+            follow_up = "Can you elaborate on that?"
         if follow_up and follow_up not in asked_questions:
             questions.insert(current_question + 1, follow_up)
             asked_questions.add(follow_up)
             interview_context["follow_up_depth"] += 1
             current_question += 1
-            logging.debug(f"Added follow-up question: {follow_up}")
+            logging.debug(f"Added compulsory follow-up question: {follow_up}")
             return jsonify({
                 "reply": reply,
                 "current_question": follow_up,
@@ -375,7 +420,7 @@ def submit_answer():
                 "next_question": True
             })
     
-    # Move to next question if no follow-up or max follow-ups reached
+    # Move to next predefined question after follow-ups
     interview_context["follow_up_depth"] = 0
     current_question += 1
     if current_question < len(questions):
@@ -414,7 +459,6 @@ def index():
 def start_interview():
     global questions, current_question, evaluations, use_voice, asked_questions, resume_questions, interview_context
     
-    # Extract request data
     language = request.form['language']
     mode = request.form['mode']
     interview_track = request.form['interview_track']
@@ -422,7 +466,6 @@ def start_interview():
     use_voice = mode == 'voice'
     resume_file = request.files.get('resume') if interview_track == 'resume' else None
 
-    # Handle resume file for resume track
     resume_text = ""
     if interview_track == 'resume':
         if not resume_file:
@@ -441,13 +484,11 @@ def start_interview():
         os.remove(resume_path)
         logging.debug(f"Resume text extracted: {resume_text[:100]}...")
 
-    # Initialize variables
     questions = []
     current_question = 0
     evaluations = []
     asked_questions = set()
     
-    # Populate questions based on interview track
     if interview_track == "resume":
         resume_questions = generate_resume_questions(resume_text)
         predefined_questions = structure['resume_flow'][:3]
@@ -467,30 +508,26 @@ def start_interview():
             questions = [q for sublist in structure['interest_areas'].values() for q in sublist]
         logging.debug(f"Interest areas questions: {questions}")
 
-    # Clean up questions and update asked set
     questions = [strip_numbering(q) for q in questions if q not in asked_questions]
     asked_questions.update(questions)
     logging.debug(f"Questions after filtering: {questions}")
 
-    # Check if questions list is empty
     if not questions:
         logging.error(f"No questions available for track={interview_track}, sub_track={sub_track}")
         return jsonify({"error": f"No questions available for the selected track: {interview_track} - {sub_track}"}), 400
     
-    # Update interview context
     interview_context.update({
         'questions': questions,
         'current_question_idx': 0,
         'previous_answers': [],
         'scores': [],
-        'follow_up_depth': 1,
+        'follow_up_depth': 0,
         'max_follow_ups': 2,
         'interview_track': interview_track,
         'sub_track': sub_track,
         'asked_questions': asked_questions
     })
     
-    # Return successful response
     logging.info(f"Starting interview with {len(questions)} questions")
     return jsonify({
         "message": "Starting interview",
@@ -499,6 +536,13 @@ def start_interview():
         "question_number": 1,
         "use_voice": use_voice
     })
+
+@app.route('/submit_voice_answer', methods=['POST'])
+def submit_voice_answer():
+    """Simulate submitting a voice answer to the queue."""
+    answer = request.json.get('answer', "No response provided")
+    voice_answer_queue.put(answer)
+    return jsonify({"message": "Voice answer received"})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # Use Render's PORT or default to 5000 locally
