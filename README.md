@@ -2,7 +2,7 @@
 
 # 🎉 HR Interviewer: Your AI-Powered MBA Prep Buddy! 🚀
 
-Welcome to **HR Interviewer**—a dazzling, AI-driven web app that turns interview prep into an exciting adventure! Whether you're aiming for an MBA at IIM, ISB, or beyond, this tool crafts personalized questions, chats with you in text or voice, and dishes out scores and feedback faster than you can say "hire me!" Powered by Grok (xAI), it’s your ticket to acing that interview with flair! 🌟
+Welcome to **HR Interviewer**—a dazzling, AI-driven web app that turns interview prep into an exciting adventure! Whether you're aiming for an MBA at IIM, ISB, or beyond, this tool crafts personalized questions, chats with you in text or voice, and dishes out scores and feedback faster than you can say "hire me!" Powered by Deepseek r1, it’s your ticket to acing that interview with flair! 🌟
 
 ---
 
@@ -24,7 +24,6 @@ Welcome to **HR Interviewer**—a dazzling, AI-driven web app that turns intervi
 
 - **Python 3.11+**: The engine under the hood—get it revving!
 - **Git**: Clone this baby like a pro.
-- **Groq API Key**: Snag one from [Groq](https://groq.com) to unleash the AI magic.
 - **MBA_Question.pdf**: Our question bank—comes with the repo or whip up your own!
 
 ---
@@ -40,7 +39,7 @@ Hop over to: [https://ai-interview-hce4.onrender.com](https://ai-interview-hce4.
 
 1. **Grab the Code:**
    ```bash
-   git clone https://github.com/your-username/hr-interviewer.git
+   git clone https://github.com/avinashhmavi/hr-interviewer.git
    cd hr-interviewer
    ```
 
@@ -54,7 +53,7 @@ Hop over to: [https://ai-interview-hce4.onrender.com](https://ai-interview-hce4.
    Save this to `requirements.txt`:
    ```
    Flask==2.3.3
-   groq
+   llamaapi
    pdfplumber==0.11.4
    python-docx==1.1.2
    python-dotenv==1.0.1
@@ -68,9 +67,9 @@ Hop over to: [https://ai-interview-hce4.onrender.com](https://ai-interview-hce4.
 4. **Set the Secret Sauce:**
    Create a `.env` file:
    ```bash
-   echo "GROQ_API_KEY=your-groq-api-key" > .env
+   echo "Llama_API_KEY=your-llama-api-key" > .env
    ```
-   Swap in your Groq API key—keep it hush-hush! 🤫
+   Swap in your llama-API key—keep it hush-hush! 🤫
 
 5. **Drop the Question Bank:**
    - Make sure `MBA_Question.pdf` is in the root folder. It’s included, or craft your own with sections like:
