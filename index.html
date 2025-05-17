@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR & Banking Interviewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #1e3c72, #2a5298); color: #333; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .container { max-width: 1000px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15); padding: 40px; position: relative; overflow: hidden; }
+        h1 { color: #2a5298; text-align: center; font-size: 2.8em; margin-bottom: 30px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .form-section, .question-section, .summary-section { background: #f8fafc; border-radius: 15px; padding: 25px; margin-bottom: 25px; transition: all 0.3s ease; border: 1px solid #e2e8f0; }
+        .form-section:hover, .question-section:hover, .summary-section:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); }
+        .question { color: #2a5298; font-size: 1.5em; font-weight: 600; margin-bottom: 15px; }
+        .reply { color: #059669; font-style: italic; font-size: 1.1em; margin-top: 10px; }
+        .feedback { color: #d97706; font-size: 1.1em; margin-top: 10px; }
+        .score { color: #059669; font-weight: 600; }
+        .overall-score { text-align: center; background: #ecfdf5; padding: 20px; border-radius: 10px; font-size: 1.4em; margin-top: 20px; border: 1px solid #a7f3d0; }
+        button { padding: 12px 30px; background: linear-gradient(45deg, #2a5298, #1e3c72); color: white; border: none; border-radius: 50px; cursor: pointer; font-size: 1.1em; font-weight: 500; transition: all 0.3s ease; margin: 10px 10px 0 0; }
+        button:hover { background: linear-gradient(45deg, #1e3c72, #2a5298); transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        button:disabled { background: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+        textarea { width: 100%; height: 150px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1.1em; resize: none; background: #f8fafc; margin: 15px 0; transition: border-color 0.3s ease; }
+        textarea:focus { border-color: #2a5298; outline: none; box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.2); }
+        select, input[type="file"] { padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1.1em; background: #f8fafc; width: 100%; margin: 15px 0; transition: border-color 0.3s ease; }
+        select:focus, input[type="file"]:focus { border-color: #2a5298; outline: none; box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.2); }
+        label { font-size: 1.1em; color: #4b5563; margin-bottom: 8px; display: block; }
+        .radio-group { display: flex; gap: 20px; margin: 15px 0; }
+        .camera-option { margin: 20px 0; padding: 10px; background-color: #eef2ff; border-radius: 8px; border: 1px solid #c7d2fe; }
+        .camera-option label { display: inline-flex; align-items: center; cursor: pointer; }
+        .camera-option input[type="checkbox"] { width: auto; margin-right: 10px; transform: scale(1.2); }
+        #status-text, #progress-text { color: #6b7280; font-style: italic; margin: 10px 0; font-size: 1em; min-height: 1.2em; }
+        #sub-track-section { display: none; margin-top: 15px; }
+        .progress-bar { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; margin-bottom: 20px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(45deg, #2a5298, #1e3c72); transition: width 0.3s ease; }
+        .evaluation-block { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+        .evaluation-block h4 { color: #2a5298; margin-bottom: 10px; }
+        .evaluation-block p { margin-bottom: 8px; }
+        #camera-feed-container { margin-top: 15px; display: flex; justify-content: center; margin-bottom: 15px; }
+        #camera-feed { border: 2px solid #cbd5e1; border-radius: 10px; background-color: #f1f5f9; object-fit: cover; }
+        @media (max-width: 768px) { .container { padding: 20px; } h1 { font-size: 2em; } button { width: 100%; margin: 10px 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="app-title">Interviewer</h1>
+        <div id="start-section" class="form-section">
+            <div id="resume-upload-section"> <label for="resume-file">Upload resume (PDF/DOCX):</label> <input type="file" id="resume-file" accept=".pdf,.docx" required> </div>
+            <label for="interview-track">Select interview track:</label> <select id="interview-track" onchange="toggleSubTrack()"></select>
+            <div id="sub-track-section"> <label for="sub-track">Select specific area:</label> <select id="sub-track"></select> </div>
+            <label for="language">Language (for voice recognition):</label> <select id="language"> <option value="en-IN">English (India)</option> <option value="en-US">English (US)</option> <option value="en-GB">English (UK)</option> </select>
+            <label for="voice-model">Voice model (for AI responses):</label> <select id="voice-model"> <option value="alloy">Alloy</option> <option value="echo">Echo</option> <option value="fable">Fable</option> <option value="onyx">Onyx</option> <option value="nova">Nova</option> <option value="shimmer">Shimmer</option> <option value="sage">Sage</option> </select>
+            <label>Chat mode:</label> <div class="radio-group"> <label><input type="radio" name="mode" value="text" checked> Text</label> <label><input type="radio" name="mode" value="voice"> Voice</label> </div>
+            <div class="camera-option"> <label for="enable-camera"><input type="checkbox" id="enable-camera" name="enable-camera"> Enable Camera for Visual Analysis</label> </div>
+            <button onclick="startInterview()">Start Interview</button>
+        </div>
+        <div id="question-section" class="question-section" style="display: none;">
+            <div class="progress-bar"> <div class="progress-fill" id="progress-fill" style="width: 0%;"></div> </div>
+            <p id="progress-text"></p> <p id="question-text" class="question"></p>
+            <div id="camera-feed-container"> <video id="camera-feed" width="320" height="240" autoplay playsinline muted style="display: none;"></video> </div>
+            <p id="status-text"></p> <textarea id="answer-input" placeholder="Type your answer or speak..."></textarea>
+            <button id="submit-btn" onclick="submitAnswer()" style="display: none;">Submit Answer</button>
+            <button id="pause-btn" onclick="togglePause()" style="display: none;">Pause</button>
+            <p id="reply-text" class="reply"></p>
+        </div>
+        <div id="summary-section" class="summary-section" style="display: none;">
+            <h2>Interview Summary</h2> <div id="evaluations"></div> <div id="overall-score" class="overall-score"></div>
+        </div>
+    </div>
+    <script>
+        let totalQuestions = 0, useVoice = false, useCamera = false, questionNumber = 0, isPaused = false;
+        let recognition, silenceTimer, currentAudio = null, cameraStream = null, frameAnalysisInterval = null;
+        let isSpeaking = false, isListening = false, accumulatedTranscript = '', playbackLock = false;
+        let allowedType = '';
+        let programmaticStop = false; // Flag to indicate if STT stop was intentional by our code
+
+        function setupSpeechRecognition() {
+            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.continuous = true; recognition.interimResults = true; recognition.maxAlternatives = 1;
+                
+                recognition.onstart = () => { 
+                    isListening = true; 
+                    document.getElementById('status-text').textContent = 'Listening... Speak clearly.';
+                    console.log('STT: onstart fired. isListening = true.');
+                };
+
+                recognition.onresult = (event) => {
+                    console.log('STT: onresult fired.');
+                    let interim = '', finalThisTurn = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) finalThisTurn += transcript + ' '; else interim = transcript;
+                    }
+                    const answerInput = document.getElementById('answer-input');
+                    if (finalThisTurn) accumulatedTranscript += finalThisTurn;
+                    answerInput.value = accumulatedTranscript + interim;
+
+                    if (finalThisTurn && useVoice && !isPaused && !isSpeaking) {
+                        clearTimeout(silenceTimer);
+                        silenceTimer = setTimeout(() => {
+                            if (isListening && !isSpeaking && !isPaused) {
+                                console.log('STT: Silence timer triggered, preparing to submit.');
+                                programmaticStop = true; // Indicate this stop is for submission
+                                if(recognition) recognition.stop(); 
+                                // isListening will be set to false in onend
+                                document.getElementById('status-text').textContent = '';
+                                submitAnswer();
+                            }
+                        }, 3000);
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('STT: onerror fired:', event);
+                    document.getElementById('status-text').textContent = `Speech error: ${event.error}. Please check microphone.`;
+                    isListening = false; // Ensure state is correct
+                };
+
+                recognition.onend = () => {
+                    const wasProgrammatic = programmaticStop;
+                    programmaticStop = false; // Reset flag for the next cycle
+                    isListening = false; // Crucial: STT has ended.
+                    console.log(`STT: onend fired. isListening = false. Was programmatic stop: ${wasProgrammatic}`);
+
+                    if (wasProgrammatic) {
+                        console.log("STT: Programmatic stop, no auto-restart from onend.");
+                        return; // Do not auto-restart if stopped by our code logic (e.g., before TTS or for submission)
+                    }
+
+                    // Auto-restart logic ONLY for unexpected stops (e.g. browser ending it prematurely)
+                    const qSectionVisible = document.getElementById('question-section').style.display === 'block';
+                    const summaryVisible = document.getElementById('summary-section').style.display === 'block';
+                    if (useVoice && !isPaused && !isSpeaking && qSectionVisible && !summaryVisible) {
+                        console.log("STT: Unexpected end, attempting auto-restart.");
+                        setTimeout(() => {
+                            if (useVoice && !isPaused && !isSpeaking && !isListening && qSectionVisible && !summaryVisible) {
+                                startListening();
+                            }
+                        }, 300); // Small delay before trying to restart
+                    }
+                };
+            } else { 
+                console.warn('STT not supported.'); 
+                const voiceRadio = document.querySelector('input[value="voice"]');
+                if (voiceRadio) voiceRadio.disabled = true;
+                const voiceLabel = document.querySelector('label:has(input[value="voice"])');
+                if (voiceLabel) voiceLabel.textContent += ' (Not Supported)';
+            }
+        }
+        
+        function startListening() {
+            if (recognition && useVoice && !isPaused && !isSpeaking) {
+                if (isListening) {
+                    console.warn("STT: startListening called, but already isListening. Aborting new start.");
+                    return;
+                }
+                console.log("STT: Attempting to start listening. States: isSpeaking=", isSpeaking, "isPaused=", isPaused);
+                try {
+                    accumulatedTranscript = document.getElementById('answer-input').value; 
+                    if(accumulatedTranscript && !accumulatedTranscript.endsWith(' ')) accumulatedTranscript += ' ';
+                    
+                    recognition.lang = document.getElementById('language').value;
+                    
+                    // Small delay before starting, re-checking conditions
+                    setTimeout(() => {
+                        if (useVoice && !isListening && !isPaused && !isSpeaking) {
+                            console.log("STT: Executing recognition.start() after delay.");
+                            programmaticStop = false; // Ensure flag is reset before a new natural listen cycle
+                            recognition.start(); // onstart will set isListening = true
+                        } else {
+                            console.log("STT: Conditions for starting changed during delay. Aborting start. isListening:", isListening, "isSpeaking:", isSpeaking, "isPaused:", isPaused);
+                        }
+                    }, 150); // 150ms delay might help with mic re-engagement
+
+                } catch (e) { 
+                    console.error("STT: startListening function error:", e); 
+                    isListening = false; 
+                    document.getElementById('status-text').textContent = 'Voice recognition start error.';
+                }
+            } else {
+                console.log("STT: Conditions not met for starting. useVoice=", useVoice, "isListening=", isListening, "isPaused=", isPaused, "isSpeaking=", isSpeaking);
+            }
+        }
+        
+        function stopCurrentAudioPlayback() {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.onended = null; currentAudio.onerror = null;
+                if (currentAudio.src && currentAudio.src.startsWith('blob:')) URL.revokeObjectURL(currentAudio.src);
+                currentAudio.src = ''; currentAudio.load(); currentAudio = null;
+                console.log("TTS: Playback stopped & resources released.");
+            }
+            playbackLock = false;
+        }
+
+        function stopAllVoiceActivity(isIntentionalStop = false) { // isIntentionalStop for clarity
+            console.log(`Stopping all voice activity. Intentional: ${isIntentionalStop}`);
+            stopCurrentAudioPlayback(); // Stops TTS
+            
+            programmaticStop = isIntentionalStop; // Set flag based on why we're stopping
+            if (recognition && isListening) {
+                console.log("STT: stopAllVoiceActivity - stopping active recognition.");
+                recognition.stop(); // This will trigger recognition.onend
+            } else {
+                 programmaticStop = false; // If not listening, no programmatic stop was needed for STT
+            }
+            // isListening will be set to false by recognition.onend
+            // If not listening, ensure flag is false anyway.
+            if(!isListening) programmaticStop = false;
+
+
+            isSpeaking = false; // TTS is stopped.
+            clearTimeout(silenceTimer);
+            // document.getElementById('status-text').textContent = ''; // Usually cleared by next state text
+        }
+
+        async function speakText(text, callback) {
+            if (playbackLock && currentAudio) {
+                console.warn('TTS: speakText called while playbackLock true. Request ignored.');
+                if (callback) setTimeout(callback, 50); return;
+            }
+            // Stop STT before starting TTS. Mark this as a programmatic stop for STT.
+            stopAllVoiceActivity(true); 
+
+            playbackLock = true; isSpeaking = true;
+            document.getElementById('status-text').textContent = 'Interviewer is speaking...';
+            
+            try {
+                const response = await fetch('/generate_speech', { /* ... */ 
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text, voice: document.getElementById('voice-model').value })
+                });
+                if (!response.ok) { const d = await response.json(); throw new Error(d.error || `HTTP ${response.status}`); }
+                const audioBlob = await response.blob();
+                if (audioBlob.size === 0) throw new Error('Empty audio data from server.');
+
+                currentAudio = new Audio(URL.createObjectURL(audioBlob));
+                currentAudio.play().catch(e => { console.error('TTS Playback err:', e); throw e; });
+                currentAudio.onended = () => {
+                    console.log('TTS: onended fired.');
+                    stopCurrentAudioPlayback(); isSpeaking = false;
+                    document.getElementById('status-text').textContent = '';
+                    if (callback) callback();
+                };
+                currentAudio.onerror = (e) => {
+                    console.error('TTS: Audio Element Error:', e);
+                    document.getElementById('status-text').textContent = 'Error playing interview voice.';
+                    stopCurrentAudioPlayback(); isSpeaking = false;
+                    if (callback) callback();
+                };
+            } catch (error) {
+                console.error('TTS: speakText outer error:', error);
+                document.getElementById('status-text').textContent = `TTS Error: ${error.message}`;
+                stopCurrentAudioPlayback(); isSpeaking = false;
+                if (callback) callback();
+            }
+        }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                stopAllVoiceActivity(true); // Pausing is an intentional stop of current activity
+                if(frameAnalysisInterval) clearInterval(frameAnalysisInterval);
+                document.getElementById('pause-btn').textContent = 'Resume';
+                document.getElementById('status-text').textContent = 'Interview Paused.';
+            } else {
+                document.getElementById('pause-btn').textContent = 'Pause';
+                document.getElementById('status-text').textContent = ''; // Clear "Paused"
+                // Resume listening ONLY if AI is not about to speak. 
+                // Typically, resuming might mean repeating the question or just waiting for user.
+                // For now, let's assume AI doesn't auto-speak on resume, so user can speak.
+                if (useVoice && !isSpeaking) { // Check !isSpeaking before starting to listen
+                    startListening();
+                }
+                if (useCamera && cameraStream) startFrameAnalysis();
+            }
+        }
+
+        async function captureAndSendFrame() { /* No changes needed */
+            if (!useCamera || !cameraStream || isPaused) return;
+            const videoElement = document.getElementById('camera-feed');
+            if (!videoElement.srcObject || videoElement.readyState < videoElement.HAVE_ENOUGH_DATA || videoElement.videoWidth === 0) return;
+            const canvas = document.createElement('canvas'); canvas.width = videoElement.videoWidth; canvas.height = videoElement.videoHeight;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            try { await fetch('/analyze_visuals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_data: imageDataUrl }) });
+            } catch (error) { console.error('Frame send error:', error); }
+        }
+        function startFrameAnalysis() { if (useCamera && cameraStream && !frameAnalysisInterval) { captureAndSendFrame(); frameAnalysisInterval = setInterval(captureAndSendFrame, 5000); } }
+        function stopFrameAnalysis() { if (frameAnalysisInterval) { clearInterval(frameAnalysisInterval); frameAnalysisInterval = null; } }
+        function toggleSubTrack() { /* No changes needed */
+            const track = document.getElementById('interview-track').value;
+            const subTrackSection = document.getElementById('sub-track-section'); const subTrackSelect = document.getElementById('sub-track');
+            subTrackSelect.innerHTML = ''; let options = [];
+            if (track === 'school_based') { options = [ { value: 'IIM', text: 'IIM' }, { value: 'ISB', text: 'ISB' }, { value: 'Other', text: 'Other B-Schools' }]; }
+            else if (track === 'interest_areas') { options = [ { value: 'General Business', text: 'General Business & Leadership' }, { value: 'Finance', text: 'Finance & Economics' }, { value: 'Marketing', text: 'Marketing & Strategy' }, { value: 'Operations', text: 'Operations & Supply Chain' }];}
+            else if (track === 'bank_type') { options = [ { value: 'Public Sector Banks', text: 'Public Sector Banks' }, { value: 'Private Banks', text: 'Private Banks' }, { value: 'Regulatory Roles', text: 'Regulatory Roles' }];}
+            else if (track === 'technical_analytical') { options = [ { value: 'Banking Knowledge', text: 'Banking Knowledge' }, { value: 'Logical Reasoning', text: 'Logical Reasoning' }, { value: 'Situational Judgement', text: 'Situational Judgement' }, { value: 'Current Affairs', text: 'Current Affairs' }];}
+            if (options.length > 0) { subTrackSection.style.display = 'block'; options.forEach(optData => { const option = document.createElement('option'); option.value = optData.value; option.textContent = optData.text; subTrackSelect.appendChild(option); }); }
+            else { subTrackSection.style.display = 'none'; }
+        }
+
+        async function startInterview() { /* Minor logging, error handling ensures cleanup */
+            const resumeFile = document.getElementById('resume-file').files[0];
+            if (!resumeFile) { alert('Please upload resume.'); return; }
+            document.getElementById('start-section').style.display = 'none';
+            document.getElementById('question-section').style.display = 'block';
+            document.getElementById('status-text').textContent = 'Initializing...';
+            useVoice = document.querySelector('input[name="mode"]:checked').value === 'voice';
+            useCamera = document.getElementById('enable-camera').checked;
+            const formData = new FormData(); 
+            formData.append('interview_track', document.getElementById('interview-track').value);
+            if (document.getElementById('sub-track-section').style.display === 'block') formData.append('sub_track', document.getElementById('sub-track').value);
+            formData.append('language', document.getElementById('language').value);
+            formData.append('mode', useVoice ? 'voice' : 'text');
+            formData.append('resume', resumeFile); formData.append('use_camera', useCamera);
+
+            const videoElement = document.getElementById('camera-feed');
+            if (useCamera) {
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    videoElement.srcObject = cameraStream; videoElement.style.display = 'block'; startFrameAnalysis();
+                } catch (err) { console.error("Camera access error:", err); alert("Camera access failed."); videoElement.style.display = 'none'; useCamera = false; stopFrameAnalysis(); }
+            } else { videoElement.style.display = 'none'; stopFrameAnalysis(); }
+
+            try {
+                const response = await fetch('/start_interview', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (data.error) { throw new Error(data.error); } // Centralize error handling in catch
+                
+                totalQuestions = data.total_questions; questionNumber = 1;
+                if(recognition) recognition.lang = document.getElementById('language').value;
+                accumulatedTranscript = '';
+                document.getElementById('progress-text').textContent = `Q ${data.question_number} of ${totalQuestions}`;
+                document.getElementById('progress-fill').style.width = `${(data.question_number/totalQuestions)*100}%`;
+                document.getElementById('question-text').textContent = data.current_question;
+                document.getElementById('answer-input').value = ''; document.getElementById('reply-text').textContent = '';
+                document.getElementById('status-text').textContent = '';
+                document.getElementById('submit-btn').style.display = useVoice ? 'none' : 'inline-block';
+                document.getElementById('pause-btn').style.display = 'inline-block'; isPaused = false;
+
+                if (useVoice) {
+                    speakText(`Welcome! Here is your first question: ${data.current_question}`, () => {
+                        if (!isPaused) startListening();
+                    });
+                } else {
+                    document.getElementById('status-text').textContent = 'Please type your answer.';
+                }
+            } catch (error) {
+                console.error('Start interview failed:', error);
+                alert(`Failed to start: ${error.message || 'Server error'}`);
+                document.getElementById('start-section').style.display = 'block';
+                document.getElementById('question-section').style.display = 'none';
+                document.getElementById('status-text').textContent = '';
+                if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
+                stopFrameAnalysis(); stopAllVoiceActivity();
+            }
+        }
+
+        async function submitAnswer() {
+            if (isSpeaking) { console.warn("Submit blocked: AI speaking."); return; }
+            
+            programmaticStop = true; // Submission is an intentional end to current listening
+            if (useVoice && recognition && isListening) {
+                console.log("Submit called, stopping STT to finalize transcript.");
+                recognition.stop(); // onend will set isListening=false
+                await new Promise(resolve => setTimeout(resolve, 100)); // Shorter delay, just for event loop
+            }
+            programmaticStop = false; // Reset after potential stop
+            
+            const answer = document.getElementById('answer-input').value.trim();
+            if (!answer && !useVoice) { document.getElementById('status-text').textContent = 'Please provide an answer.'; return; }
+
+            document.getElementById('status-text').textContent = 'Processing...';
+            const submitBtn = document.getElementById('submit-btn'); const pauseBtn = document.getElementById('pause-btn');
+            if(submitBtn) submitBtn.disabled = true; if(pauseBtn) pauseBtn.disabled = true;
+
+            try {
+                const response = await fetch('/submit_answer', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer: answer || "" }) 
+                });
+                const data = await response.json();
+                if(submitBtn) submitBtn.disabled = false; if(pauseBtn) pauseBtn.disabled = false;
+
+                totalQuestions = data.total_questions || totalQuestions;
+                document.getElementById('reply-text').textContent = data.reply;
+                document.getElementById('answer-input').value = ''; accumulatedTranscript = '';
+                document.getElementById('status-text').textContent = '';
+
+                if (data.finished) {
+                    console.log("Interview finished. Stopping all voice activity before final message.");
+                    stopAllVoiceActivity(true); // Ensure everything is stopped before final TTS
+
+                    document.getElementById('question-section').style.display = 'none';
+                    document.getElementById('summary-section').style.display = 'block';
+                    stopFrameAnalysis(); 
+                    if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
+                    
+                    const evaluationsDiv = document.getElementById('evaluations'); evaluationsDiv.innerHTML = ''; 
+                    if (data.evaluations && Array.isArray(data.evaluations)) {
+                        data.evaluations.forEach((evalItem, index) => { 
+                            const block = document.createElement('div'); block.className = 'evaluation-block';
+                            block.innerHTML = `<p class="question">Q ${index + 1}: ${evalItem.question}</p><p><strong>Ans:</strong> ${evalItem.answer}</p><p class="feedback"><strong>Feedback:</strong> ${evalItem.evaluation}</p><p class="score"><strong>Score:</strong> ${evalItem.score}/10</p>`;
+                            evaluationsDiv.appendChild(block);
+                        });
+                    }
+                    if (data.visual_score_details) { 
+                        const visualBlock = document.createElement('div'); visualBlock.className = 'evaluation-block';
+                        visualBlock.innerHTML = `<h4>Visual Cues Analysis</h4><p class="score"><strong>Score (Sim):</strong> ${data.visual_score_details.score !== undefined && data.visual_score_details.score !== "N/A" ? data.visual_score_details.score + '/10' : 'N/A'}</p><p class="feedback"><strong>Feedback:</strong> ${data.visual_score_details.feedback || 'N/A'}</p>`;
+                        evaluationsDiv.appendChild(visualBlock);
+                    }
+                    document.getElementById('overall-score').innerHTML = `<h3>Overall Score: ${data.overall_score}/100</h3><p>Weightage: Q&A: 90%, Visuals: 10%</p>`;
+                    
+                    if (useVoice) { 
+                        speakText(`The interview is complete. Your overall score is ${data.overall_score} out of 100.`, () => {
+                            console.log("Final summary message spoken. All voice activity should be off."); 
+                        });
+                    }
+                } else if (data.next_question) {
+                    document.getElementById('progress-text').textContent = `Q ${data.question_number} of ${totalQuestions}`;
+                    document.getElementById('progress-fill').style.width = `${(data.question_number / totalQuestions) * 100}%`;
+                    document.getElementById('question-text').textContent = data.current_question;
+                    if (useVoice) {
+                        speakText(`${data.reply}. Next question: ${data.current_question}`, () => {
+                           if(!isPaused) startListening();
+                        });
+                    } else {
+                         document.getElementById('status-text').textContent = 'Please type your answer.';
+                    }
+                }
+            } catch (error) {
+                document.getElementById('status-text').textContent = 'Error submitting. Try again.';
+                console.error('Submit answer error:', error);
+                if(submitBtn) submitBtn.disabled = false; if(pauseBtn) pauseBtn.disabled = false;
+                // Only try to restart listening if an error occurred during submission *and* we are in a state to listen
+                if (useVoice && !isSpeaking && !isPaused && !isListening) {
+                     setTimeout(startListening, 1000); // Try to recover STT after an error
+                }
+            }
+        }
+
+        function initializeApp(allowedUserType) { /* No changes needed */
+            allowedType = allowedUserType; 
+            document.getElementById('app-title').textContent = allowedType === 'MBA' ? 'HR Interviewer (MBA)' : 'Banking Interviewer';
+            const interviewTrackSelect = document.getElementById('interview-track');
+            interviewTrackSelect.innerHTML = ''; let mainTracks = [];
+            if (allowedType === 'MBA') { mainTracks = [ { value: 'resume', text: 'Resume-based' }, { value: 'school_based', text: 'School Based' }, { value: 'interest_areas', text: 'Interest Areas' }]; }
+            else { mainTracks = [ { value: 'resume', text: 'Resume-based' }, { value: 'bank_type', text: 'Bank Type' }, { value: 'technical_analytical', text: 'Technical & Analytical' }]; }
+            mainTracks.forEach(opt => { const option = document.createElement('option'); option.value = opt.value; option.textContent = opt.text; interviewTrackSelect.appendChild(option); });
+            toggleSubTrack();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() { 
+            setupSpeechRecognition();
+            const allowed = sessionStorage.getItem('allowed');
+            if (allowed) { initializeApp(allowed); } else { window.location.href = '/login.html'; }
+        });
+    </script>
+</body>
+</html>
