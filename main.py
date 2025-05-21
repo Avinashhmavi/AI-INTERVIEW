@@ -355,7 +355,7 @@ def generate_next_question(question, answer, score, interview_track, job_type, a
              'passion, knowledge, application' if interview_track == 'interest_areas' else
              'banking operations, customer service' if interview_track == 'bank_type' else
              'technical banking, logical reasoning' if interview_track == 'technical_analytical' else 'relevance')
-    prompt = f"""Given the Q&A for a {job_type} candidate (score: {score}/10), generate a related follow-up question. The question must be a complete, concise sentence ending with a question mark. Focus on {focus}.
+    prompt = f"""Given the Q&A for a {job_type} candidate (score: {score}/10), generate a related question.The question should be a complete sentence, concise, and end with a question mark. Focus on {focus}.
 Q: {question}
 A: {answer}
 Score: {score}/10"""
@@ -373,7 +373,7 @@ Score: {score}/10"""
     return next_q
 
 def generate_conversational_reply(answer, job_type):
-    sys_prompt = f"As a friendly {'HR' if job_type == 'mba' else 'banking HR'} interviewer, generate a short, complete sentence responding to the candidate’s answer. Ensure it’s engaging, human-like, and a full thought. The reply must be a statement (ending with a period or exclamation mark) without questions. Provide only feedback or encouragement."
+    sys_prompt = f"As a friendly {'HR' if job_type == 'mba' else 'banking HR'} interviewer, generate a short, complete sentence as a reply to the candidate’s answer. Keep it engaging and human-like, and ensure it's a full thought. The reply must be a statement (ending with a period or exclamation mark) and must not contain any questions (do not end with a question mark). Provide only feedback or encouragement without asking for further information."
     resp_text = get_openai_response_generic([{"role": "system", "content": sys_prompt}, {"role": "user", "content": answer}], temperature=0.8, max_tokens=60)
     if "Error" in resp_text or "OpenAI client not available" in resp_text:
         return "Thanks for your response."
